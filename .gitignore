@@ -1,6 +1,7 @@
 # Airflow stuff
 logs/
 data/
+datalake/
 airflow.db
 airflow.cfg
 unittests.cfg
