@@ -1,0 +1,11 @@
+CREATE DATABASE weather_data;
+-- \c weather_data;
+-- CREATE TABLE IF NOT EXISTS weather_table (
+--             index SERIAL PRIMARY KEY,
+--             date_time TIMESTAMP,
+--             temp_out FLOAT,
+--             hum_out INTEGER,
+--             rainfall_mm FLOAT,
+--             wind_speed_avg INTEGER,
+--             wind_speed_hi INTEGER
+--             );

@@ -1,0 +1,6 @@
+*.log
+data
+.vscode
+logs
+__pycahe__
+*.pyc
