@@ -15,6 +15,8 @@ from modules.read_historic_weatherdata_S3 import read_historic_weather_data
 from modules.postgres_to_S3_aggData import get_postgres_data
 from modules.extract_wheather_data_API import extract_weather_data
 from ml_proccess.transform_preparation_data import transform_preparation_data
+from ml_proccess.train_optimizeHP import train_model
+from ml_proccess.evaluate_model import evaluate_model
 
 
 def upload_to_s3(filename: str, key: str, bucket_name: str) -> None:
@@ -29,7 +31,7 @@ def s3_to_local(key: str, bucket_name: str, local_path: str) -> str:
 
 
 with DAG(
-    dag_id="ml_dust_prediction8",
+    dag_id="ml_dust_prediction_",
     schedule_interval="@daily",
     start_date=airflow.utils.dates.days_ago(1),
     catchup=False,
@@ -39,6 +41,7 @@ with DAG(
         task_id="create_weather_table",
         postgres_conn_id="postgres_local",
         sql="""
+            DROP TABLE IF EXISTS weather_table;
             CREATE TABLE IF NOT EXISTS weather_table (
             index SERIAL PRIMARY KEY,
             date_time TIMESTAMP,
@@ -55,6 +58,7 @@ with DAG(
         task_id="create_dust_table",
         postgres_conn_id="postgres_local",
         sql="""
+            DROP TABLE IF EXISTS dust_table;
             CREATE TABLE IF NOT EXISTS dust_table (
             index SERIAL PRIMARY KEY,
             limite_deteccion VARCHAR,
@@ -66,11 +70,8 @@ with DAG(
     )
 
     ingest_dust_data = PythonOperator(
-        task_id="ingest_dustdata_from_API",
-        python_callable=extract_dust_data
+        task_id="ingest_dustdata_from_API", python_callable=extract_dust_data
     )
-
-
 
     read_from_s3 = PythonOperator(
         task_id="read_S3_and_process_data",
@@ -81,14 +82,17 @@ with DAG(
         },
     )
 
-
     read_from_s3_weather = PythonOperator(
-        task_id="read_S3_weather",
+        task_id="read_S3_historic_weatherdata",
         python_callable=read_historic_weather_data,
         op_kwargs={
             "key": "rawdata/weather/alldatapir.json",
             "bucket_name": "bucket-csalinas",
         },
+    )
+
+    update_weatherdata_from_API = PythonOperator(
+        task_id="update_weatherdata", python_callable=extract_weather_data
     )
 
     get_postgres_data = PythonOperator(
@@ -98,25 +102,33 @@ with DAG(
     )
 
     dummy = DummyOperator(task_id="init_process")
-    
-    
+
     transform_preparation_data = PythonOperator(
         task_id="transform_prep_data",
         python_callable=transform_preparation_data,
         op_kwargs={
             "key": "input_to_model/input_to_model.json",
             "bucket_name": "bucket-csalinas",
-        }
+        },
     )
+
+    train_model = PythonOperator(task_id="training_model", python_callable=train_model)
     
+    evaluate_model = PythonOperator(
+        task_id = "evaluating_model",
+        python_callable= evaluate_model
+    )
+
+
+(dummy >> create_table_d >> ingest_dust_data >> read_from_s3 >> get_postgres_data)
 
 (
     dummy
-    >> create_table_d
-    >> ingest_dust_data
-    >> read_from_s3
-
+    >> create_table_w
+    >> read_from_s3_weather
+    >> update_weatherdata_from_API
     >> get_postgres_data
+    >> transform_preparation_data
+    >> train_model
+    >> evaluate_model
 )
-
-dummy >> create_table_w >> read_from_s3_weather >> get_postgres_data >> transform_preparation_data

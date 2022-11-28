@@ -1,7 +1,11 @@
 import pandas as pd
 import requests
 import json
+import logging
+import tempfile
+from os import path
 from airflow.hooks.S3_hook import S3Hook
+
 
 def extract_dust_data(fecha_de_inicio=None, fecha_de_fin=None):
     """Extract dust data from TCA"""
@@ -18,17 +22,17 @@ def extract_dust_data(fecha_de_inicio=None, fecha_de_fin=None):
             f"{api}?&{matriz}&{parametro}&fecha_de_inicio={fecha_de_inicio}&fecha_de_fin={fecha_de_fin}",
             headers=headers,
         )
-    with open("/opt/airflow/datalake/dust_data_raw.json", "w") as outfile:
-        json.dump(r.json(), outfile)
-    
-    
-    with open("/opt/airflow/datalake/dust_data_raw.json", "r") as openfile:
-        json_object = json.load(openfile)
-    
-    s3_hook = S3Hook(aws_conn_id="aws_conn")
-    s3_hook.load_file(
-        filename = "/opt/airflow/datalake/dust_data_raw.json",
-        key = "rawdata/dust/dust_data_raw.json",
-        bucket_name = "bucket-csalinas",
-        replace=True
-    )
+    with tempfile.TemporaryDirectory() as tmp_dir:
+            logging.info(f"Extracting data from API.....")
+            tmp_path = path.join(tmp_dir, "dust_data_raw.json")
+            with open(tmp_path, "w") as outfile:
+                json.dump(r.json(), outfile)
+            # Upload file to S3.
+            logging.info(f"Writing results to S3 rawdata/dust/dust_data_raw.json")
+            s3_hook = S3Hook(aws_conn_id="aws_conn")
+            s3_hook.load_file(
+                filename = tmp_path,
+                key="rawdata/dust/dust_data_raw.json",
+                bucket_name="bucket-csalinas",
+                replace=True,
+            )

@@ -5,6 +5,9 @@ import json
 import boto3
 from sklearn.model_selection import train_test_split
 from modules.utils import upload_to_s3
+import tempfile
+from os import path
+import logging
 
 # from airflow.hooks.S3_hook import S3Hook
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
@@ -12,10 +15,6 @@ from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 
 def transform_preparation_data(key: str, bucket_name: str):
     bucket = "bucket-csalinas"
-    prefix = "practica"
-    train_file = "vertebral_train.csv"
-    test_file = "vertebral_test.csv"
-    validate_file = "vertebral_validate.csv"
 
     hook = S3Hook("aws_conn")
     client = hook.get_conn()
@@ -30,34 +29,27 @@ def transform_preparation_data(key: str, bucket_name: str):
         data = pd.read_json(file)
         print(data)
         print(data.info())
-        X = pd.concat(
-            [
-                data.drop(["sitio", "fecha", "valor"], axis=1),
-                pd.get_dummies(data["sitio"]),
-            ],
-            axis=1,
-        )
-        y = data["valor"]
+        data["target"] = data["valor"].apply(lambda x: 1 if x >= 150 else 0)
+        data = data.drop(["sitio", "fecha", "valor"], axis=1)
+        X = data.drop(["target"], axis=1)
+        y = data["target"]
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.3, random_state=42
+            X, y, test_size=0.30, random_state=42, stratify=y
         )
 
-        X_train.to_json(
-            "/opt/airflow/datalake/X_train.json", date_format="iso", date_unit="s"
-        )
-        X_test.to_json(
-            "/opt/airflow/datalake/X_test.json", date_format="iso", date_unit="s"
-        )
-        y_train.to_json(
-            "/opt/airflow/datalake/y_train.json", date_format="iso", date_unit="s"
-        )
-        y_test.to_json(
-            "/opt/airflow/datalake/y_test.json", date_format="iso", date_unit="s"
-        )
+        dicc = {
+            "X_train": X_train,
+            "X_test": X_test,
+            "y_train": y_train,
+            "y_test": y_test,
+        }
 
-        for file in ["X_train", "X_test", "y_train", "y_test"]:
-            upload_to_s3(
-                filename=f"/opt/airflow/datalake/{file}.json",
-                key=f"input_to_model/modeling/{file}.json",
-                bucket_name=bucket,
-            )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            for file in dicc:
+                tmp_path = path.join(tmp_dir, f"{file}.json")
+                dicc[file].to_json(tmp_path, date_format="iso", date_unit="s")
+                upload_to_s3(
+                    filename=tmp_path,
+                    key=f"input_to_model/modeling/{file}.json",
+                    bucket_name=bucket,
+                )
