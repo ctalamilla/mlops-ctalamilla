@@ -19,7 +19,7 @@ Haciendo uso de herramientas de ML se intentará predecir si el valor de PM10 es
 
 De esta manera y de manera conceptual el trabajo de MLOps busca entrenar un modelo a partir del registro historico de PM10 y las variables meteorológicas como lo muestra la siguiente figura.
 
-<img src='/img/1.png' alt = 'diagrama de trabajo' width= "600">
+<img src='/img/1.png' alt = 'diagrama de trabajo' width= "800">
 
 ## Objetivo
 
@@ -39,7 +39,7 @@ En ambos casos se accede desde una API. En el caso de Weatherlink Live fue neces
 
 En el caso de la API del TCA solo es necesario consultar con un TOKEN de seguridad. 
 
-## Proceso
+## Proceso ingesta de datos
 
 Todo el proceso fue orquestado usando Airflow desde contenedores. Se trabajo primero de manera local y luego se realizo un deploy del trabajo en una instancia EC2 de AWS.
 
@@ -50,4 +50,93 @@ El modelo de ingesta de datos consiste en:
    1. Una tabla en una base de datos SQL.
    2. Carpeta del bucket denominada ```processed```. 
 
-<img src='/img/4.png' alt = 'diagrama de trabajo' width= "600">
+<img src='/img/4.png' alt = 'diagrama de trabajo' width= "800">
+
+## Proceso agregación
+
+Una vez que los datos fueron persistidos en S3 y en una tabla en una base de datos relacional (Postgres SQL en este caso) mediante una consulta SQL se unieron los dataset usando la columna de fecha de la tabla de meteorologia (previa agregación) y la tabla de con los resultados de los monitoreos de PM10.
+
+De esta manera quedó una sola tabla lista para ingresar al proceso de modelado.
+
+<img src='/img/5.png' alt = 'diagrama de trabajo' width= "800">
+<img src='/img/6.png' alt = 'diagrama de trabajo' width= "800">
+
+Todo este proceso fue horquestado mediante un DAG de Airflow. El dataset final se trata de 7 columnas y 
+2711 registros de PM10 con variables climaticas asociadas. 
+
+<img src='/img/8.png' alt = 'diagrama de trabajo' width= "800">
+
+## Proceso de preparación de datos
+
+Siguiendo con el proceso se definió una tarea en Airflow para definir la variable a predecir ```y``` , las variables predictoras ```X``` y finalmente los set de entrenamiento y testeo: ```X_train, X_test, y_train, y_test ```.
+
+Todas estas variables fueron persistidad en una carpate en el bucket de trabajo.
+```
+def transform_preparation_data(key: str, bucket_name: str):
+    bucket = "bucket-csalinas"
+
+    hook = S3Hook("aws_conn")
+    client = hook.get_conn()
+    response = client.get_object(
+        Bucket=bucket_name, Key=key
+    )  # hook.read_key(key=key, bucket_name= bucket_name)
+    status = response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+
+    if status == 200:
+        print(f"Successful S3 get_object response. Status - {status}")
+        file = response.get("Body")
+        data = pd.read_json(file)
+        print(data)
+        print(data.info())
+        data["target"] = data["valor"].apply(lambda x: 1 if x >= 150 else 0)
+        data = data.drop(["sitio", "fecha", "valor"], axis=1)
+        X = data.drop(["target"], axis=1)
+        y = data["target"]
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.30, random_state=42, stratify=y
+        )
+
+        dicc = {
+            "X_train": X_train,
+            "X_test": X_test,
+            "y_train": y_train,
+            "y_test": y_test,
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            for file in dicc:
+                tmp_path = path.join(tmp_dir, f"{file}.json")
+                dicc[file].to_json(tmp_path, date_format="iso", date_unit="s")
+                upload_to_s3(
+                    filename=tmp_path,
+                    key=f"input_to_model/modeling/{file}.json",
+                    bucket_name=bucket,
+                )
+```
+<img src='/img/7.png' alt = 'diagrama de trabajo' width= "800">
+
+## Proceso de Entrenamiento
+
+Se decidió trabajar con clasificadores, la variable target consiste en una etiqueta que indica si la medición estuvo por arriba de 150 ug/m3 (1) o por debajo de ese valor (0).
+
+El proceso de busqueda del mejor método de clasificación fue realizado en una jupyter notebook a cual se entrega con este repositorio. 
+
+El método seleccionado fue ```RandomForestClassifier``` al cual se lo sometió a una optimización de hiperparametros con ```GridSearchCV```. 
+
+La métrica seleccionada fue ```accuracy``` y el mejor modelo obtenido del ```GridSearchCV```fue almacenado tambien en el boucket de S3. 
+
+## Proceso de Evaluación de Performance del Modelo
+Finalmente el modelo fue evaluado con el conjunto de Testeo, datos que nunca observó el modelo. 
+Las métricas resultantes fuero:
+
+1. Accuracy Train: 0.89
+2. Accuracy Test: 0.85
+
+<img src='/img/9.png' alt = 'diagrama de trabajo' width= "800">
+
+
+## Operación en Cloud
+Para que el pipeline opere en la nube se inicio una instancia de EC2 ```t2.xlarge``` a la cual se le instaló docker, docker compose y se setearon los permisos dentro de la instancia para que Docker corra sin inconvenientes. 
+
+Para conectarnos a la instancia via consola se uso un par de llave publica y privada. 
+Para la conexión al webserver de Airflow y poder ver desde internet la UI de Airflow fue necesario abrir el puerto 8080 de la instancia al exterior mediante cambiando las reglas de ingreso en el security group.
