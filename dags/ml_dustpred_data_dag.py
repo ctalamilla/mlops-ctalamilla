@@ -126,7 +126,7 @@ with DAG(
     dummy
     >> create_table_w
     >> read_from_s3_weather
-    >> update_weatherdata_from_API
+ #   >> update_weatherdata_from_API
     >> get_postgres_data
     >> transform_preparation_data
     >> train_model
