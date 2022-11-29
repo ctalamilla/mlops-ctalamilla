@@ -125,6 +125,8 @@ El método seleccionado fue ```RandomForestClassifier``` al cual se lo sometió 
 
 La métrica seleccionada fue ```accuracy``` y el mejor modelo obtenido del ```GridSearchCV```fue almacenado tambien en el boucket de S3. 
 
+<img src='/img/9.png' alt = 'diagrama de trabajo' width= "800">
+
 ## Proceso de Evaluación de Performance del Modelo
 Finalmente el modelo fue evaluado con el conjunto de Testeo, datos que nunca observó el modelo. 
 Las métricas resultantes fuero:
@@ -132,7 +134,7 @@ Las métricas resultantes fuero:
 1. Accuracy Train: 0.89
 2. Accuracy Test: 0.85
 
-<img src='/img/9.png' alt = 'diagrama de trabajo' width= "800">
+<img src='/img/10.png' alt = 'diagrama de trabajo' width= "800">
 
 
 ## Operación en Cloud
@@ -140,3 +142,6 @@ Para que el pipeline opere en la nube se inicio una instancia de EC2 ```t2.xlarg
 
 Para conectarnos a la instancia via consola se uso un par de llave publica y privada. 
 Para la conexión al webserver de Airflow y poder ver desde internet la UI de Airflow fue necesario abrir el puerto 8080 de la instancia al exterior mediante cambiando las reglas de ingreso en el security group.
+
+
+<img src='/img/11.png' alt = 'diagrama de trabajo' width= "800">
