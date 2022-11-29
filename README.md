@@ -139,6 +139,7 @@ Las métricas resultantes fuero:
 <img src='/img/10.png' alt = 'diagrama de trabajo' width= "800">
 
 <img src='/img/12.png' alt = 'diagrama de trabajo' width= "800">
+
 ## Operación en Cloud
 Para que el pipeline opere en la nube se inicio una instancia de EC2 ```t2.xlarge``` a la cual se le instaló docker, docker compose y se setearon los permisos dentro de la instancia para que Docker corra sin inconvenientes. 
 
