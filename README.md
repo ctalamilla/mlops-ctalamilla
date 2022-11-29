@@ -5,4 +5,7 @@ Mina Pirquitas SA es un proyecto minero ubicado en la Puna Jujeña. La mina prod
 
 Mina Pirquitas SA posee una red de monitoreo ambiental la cual permite medir los impactos ambientales de la actividad. En el presente repositorio se trabajará solo con las mediciones de polvo ambiental (material particulado menor a 10 micrones).
 
-<img src='/img/1.png' alt = 'diagrama de trabajo' width= "300">
+<img src='/img/2.png' alt = 'diagrama de trabajo' width= "800">
+
+
+<img src='/img/1.png' alt = 'diagrama de trabajo' width= "600">
