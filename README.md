@@ -127,6 +127,8 @@ La métrica seleccionada fue ```accuracy``` y el mejor modelo obtenido del ```Gr
 
 <img src='/img/9.png' alt = 'diagrama de trabajo' width= "800">
 
+
+
 ## Proceso de Evaluación de Performance del Modelo
 Finalmente el modelo fue evaluado con el conjunto de Testeo, datos que nunca observó el modelo. 
 Las métricas resultantes fuero:
@@ -136,7 +138,7 @@ Las métricas resultantes fuero:
 
 <img src='/img/10.png' alt = 'diagrama de trabajo' width= "800">
 
-
+<img src='/img/12.png' alt = 'diagrama de trabajo' width= "800">
 ## Operación en Cloud
 Para que el pipeline opere en la nube se inicio una instancia de EC2 ```t2.xlarge``` a la cual se le instaló docker, docker compose y se setearon los permisos dentro de la instancia para que Docker corra sin inconvenientes. 
 
